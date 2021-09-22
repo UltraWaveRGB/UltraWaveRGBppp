@@ -1,17 +1,3 @@
-/**
- * Created by K. Suwatchai (Mobizt)
- * 
- * Email: k_suwatchai@hotmail.com
- * 
- * Github: https://github.com/mobizt
- * 
- * Copyright (c) 2021 mobizt
- *
-*/
-
-/** This example will show how to authenticate using 
- * the legacy token or database secret with the new APIs (using config and auth data).
-*/
 #if defined(ESP32)
 #include <WiFi.h>
 #include <FirebaseESP32.h>
@@ -21,17 +7,10 @@
 #endif
 
 #include "secret.hpp"
-
-//Provide the RTDB payload printing info and other helper functions.
 #include "addons/RTDBHelper.h"
 
-/* 3. Define the Firebase Data object */
 FirebaseData fbdo;
-
-/* 4, Define the FirebaseAuth data for authentication data */
 FirebaseAuth auth;
-
-/* Define the FirebaseConfig data for config data */
 FirebaseConfig config;
 
 unsigned long dataMillis = 0;
@@ -43,41 +22,44 @@ void setup()
     Serial.begin(115200);
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    
     Serial.print("Connecting to Wi-Fi");
     while (WiFi.status() != WL_CONNECTED)
     {
         Serial.print(".");
         delay(300);
     }
+
     Serial.println();
     Serial.print("Connected with IP: ");
     Serial.println(WiFi.localIP());
     Serial.println();
-
     Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
 
-    /* Assign the certificate file (optional) */
-    //config.cert.file = "/cert.cer";
-    //config.cert.file_storage = StorageType::FLASH;
-
-    /* Assign the database URL and database secret(required) */
     config.database_url = DATABASE_URL;
     config.signer.tokens.legacy_token = DATABASE_SECRET;
-
+    
     Firebase.reconnectWiFi(true);
-
-    /* Initialize the library with the Firebase authen and config */
     Firebase.begin(&config, &auth);
 
-    //Or use legacy authenticate method
-    //Firebase.begin(DATABASE_URL, DATABASE_SECRET);
+    pinMode(LED_BUILTIN,OUTPUT);
+    pinMode(D1,INPUT_PULLUP);
 }
 
 void loop()
 {
-    if (millis() - dataMillis > 5000)
+    if (millis() - dataMillis > 125)
     {
         dataMillis = millis();
-        Serial.printf("Set int... %s\n", Firebase.setInt(fbdo, "/test/int", count++) ? "ok" : fbdo.errorReason().c_str());
+        
+        Firebase.setInt(fbdo,"light", analogRead(A0));
+        Firebase.setInt(fbdo,"count",count++);
+        Firebase.setInt(fbdo,"button",digitalRead(D1));
+        
+        Firebase.getInt(fbdo,"led");
+        digitalWrite(LED_BUILTIN,fbdo.intData());   
+
+        Serial.printf("LDR: %d \n", fbdo.intData());
+        Serial.printf("LDR: %d \n", analogRead(A0));
     }
 }
