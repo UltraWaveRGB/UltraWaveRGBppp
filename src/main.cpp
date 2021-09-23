@@ -1,13 +1,13 @@
 #if defined(ESP32)
-#include <WiFi.h>
 #include <FirebaseESP32.h>
+#include <WiFi.h>
 #elif defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <FirebaseESP8266.h>
 #endif
 
-#include "secret.hpp"
 #include "addons/RTDBHelper.h"
+#include "secret.hpp"
 
 FirebaseData fbdo;
 FirebaseAuth auth;
@@ -16,50 +16,46 @@ FirebaseConfig config;
 unsigned long dataMillis = 0;
 int count = 0;
 
-void setup()
-{
+void setup() {
 
-    Serial.begin(115200);
+  Serial.begin(115200);
 
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    
-    Serial.print("Connecting to Wi-Fi");
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.print(".");
-        delay(300);
-    }
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-    Serial.println();
-    Serial.print("Connected with IP: ");
-    Serial.println(WiFi.localIP());
-    Serial.println();
-    Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
+  Serial.print("Connecting to Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(300);
+  }
 
-    config.database_url = DATABASE_URL;
-    config.signer.tokens.legacy_token = DATABASE_SECRET;
-    
-    Firebase.reconnectWiFi(true);
-    Firebase.begin(&config, &auth);
+  Serial.println();
+  Serial.print("Connected with IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+  Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
 
-    pinMode(LED_BUILTIN,OUTPUT);
-    pinMode(D1,INPUT_PULLUP);
+  config.database_url = DATABASE_URL;
+  config.signer.tokens.legacy_token = DATABASE_SECRET;
+
+  Firebase.reconnectWiFi(true);
+  Firebase.begin(&config, &auth);
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(D1, INPUT_PULLUP);
 }
 
-void loop()
-{
-    if (millis() - dataMillis > 125)
-    {
-        dataMillis = millis();
-        
-        Firebase.setInt(fbdo,"light", analogRead(A0));
-        Firebase.setInt(fbdo,"count",count++);
-        Firebase.setInt(fbdo,"button",digitalRead(D1));
-        
-        Firebase.getInt(fbdo,"led");
-        digitalWrite(LED_BUILTIN,fbdo.intData());   
+void loop() {
+  if (millis() - dataMillis > 125) {
+    dataMillis = millis();
 
-        Serial.printf("LDR: %d \n", fbdo.intData());
-        Serial.printf("LDR: %d \n", analogRead(A0));
-    }
+    Firebase.setInt(fbdo, "light", analogRead(A0));
+    Firebase.setInt(fbdo, "count", count++);
+    Firebase.setInt(fbdo, "button", digitalRead(D1));
+
+    Firebase.getInt(fbdo, "led");
+    digitalWrite(LED_BUILTIN, fbdo.intData());
+
+    Serial.printf("LDR: %d \n", fbdo.intData());
+    Serial.printf("LDR: %d \n", analogRead(A0));
+  }
 }
