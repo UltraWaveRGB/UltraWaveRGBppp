@@ -53,9 +53,10 @@ void loop() {
     Firebase.setInt(fbdo, "button", digitalRead(D1));
 
     Firebase.getInt(fbdo, "led");
-    digitalWrite(LED_BUILTIN, fbdo.intData());
+    int led = fbdo.intData();
+    digitalWrite(LED_BUILTIN, !led);
 
-    Serial.printf("LDR: %d \n", fbdo.intData());
+    Serial.printf("Led: %d \n", led);
     Serial.printf("LDR: %d \n", analogRead(A0));
   }
 }
