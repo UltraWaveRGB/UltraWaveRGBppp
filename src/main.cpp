@@ -7,6 +7,7 @@
 #endif
 
 #include "addons/RTDBHelper.h"
+#include "microwave.hpp"
 #include "secret.hpp"
 
 FirebaseData fbdo;
@@ -15,6 +16,62 @@ FirebaseConfig config;
 
 unsigned long dataMillis = 0;
 int count = 0;
+
+/** -------------------- **/
+
+// TODO: checar
+int led_r;
+int led_y;
+int led_g;
+int porta;
+int botao;
+
+void spin() {
+  // apita buzzer
+  // ** roda por n segundos
+  dataMillis = millis();
+  while (millis() - dataMillis < time) {
+    if (porta == ABERTA) {
+      break;
+    }
+  }
+  stop();
+}
+
+void start() {
+  if (porta == FECHADA) {
+    // apita buzzer
+    led_y = ON;
+    led_g = ON;
+    led_r = ON;
+    spin();
+  }
+}
+
+void stop() {
+  led_r = OFF;
+  led_g = OFF;
+}
+
+void abre_porta() {
+  led_y = ON;
+  porta = ABERTA;
+}
+
+void fecha_porta() {
+  led_y = OFF;
+  porta = FECHADA;
+}
+
+/** -------------------- **/
+
+void read_button() {
+  if (porta == FECHADA) {
+    abre_porta();
+  } else {
+    fecha_porta();
+  }
+}
 
 void setup() {
 
@@ -40,23 +97,24 @@ void setup() {
   Firebase.reconnectWiFi(true);
   Firebase.begin(&config, &auth);
 
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(D1, INPUT_PULLUP);
+  // TODO: setar as coisas
+  // pinMode(LED_BUILTIN, OUTPUT);
+  // pinMode(D1, INPUT_PULLUP);
 }
 
 void loop() {
-  if (millis() - dataMillis > 125) {
-    dataMillis = millis();
+  // if (millis() - dataMillis > 125) {
+  //   dataMillis = millis();
 
-    Firebase.setInt(fbdo, "light", analogRead(A0));
-    Firebase.setInt(fbdo, "count", count++);
-    Firebase.setInt(fbdo, "button", digitalRead(D1));
+  //   Firebase.setInt(fbdo, "light", analogRead(A0));
+  //   Firebase.setInt(fbdo, "count", count++);
+  //   Firebase.setInt(fbdo, "button", digitalRead(D1));
 
-    Firebase.getInt(fbdo, "led");
-    int led = fbdo.intData();
-    digitalWrite(LED_BUILTIN, !led);
+  //   Firebase.getInt(fbdo, "led");
+  //   int led = fbdo.intData();
+  //   digitalWrite(LED_BUILTIN, !led);
 
-    Serial.printf("Led: %d \n", led);
-    Serial.printf("LDR: %d \n", analogRead(A0));
-  }
+  //   Serial.printf("Led: %d \n", led);
+  //   Serial.printf("LDR: %d \n", analogRead(A0));
+  // }
 }
