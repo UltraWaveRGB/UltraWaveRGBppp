@@ -17,30 +17,34 @@ FirebaseConfig config;
 unsigned long dataMillis = 0;
 int count = 0;
 
-/** -------------------- **/
+/* --- microwave functions --- */
 
 // TODO: checar
 int led_r;
 int led_y;
 int led_g;
-int porta;
-int botao;
+int door;
+int button;
+unsigned long time_seconds;
 
 void spin() {
-  // apita buzzer
   // ** roda por n segundos
-  dataMillis = millis();
-  while (millis() - dataMillis < time) {
-    if (porta == ABERTA) {
+  unsigned long old = millis();
+  unsigned long now = millis();
+  while (now - old < time_seconds) {
+    now = millis();
+    if (door == OPEN) {
       break;
     }
+    // ** evita bloqueio das funcoes em background na placa
+    yield();
   }
   stop();
 }
 
 void start() {
-  if (porta == FECHADA) {
-    // apita buzzer
+  if (door == CLOSED) {
+    tone(D3, 500, 250);
     led_y = ON;
     led_g = ON;
     led_r = ON;
@@ -51,29 +55,34 @@ void start() {
 void stop() {
   led_r = OFF;
   led_g = OFF;
+  tone(D3, 757, 100);
+  tone(D3, 757, 100);
+  tone(D3, 757, 100);
 }
 
-void abre_porta() {
+void open_door() {
   led_y = ON;
-  porta = ABERTA;
+  door = OPEN;
 }
 
-void fecha_porta() {
+void close_door() {
   led_y = OFF;
-  porta = FECHADA;
+  door = CLOSED;
 }
 
-/** -------------------- **/
+/* --------------------------- */
 
 void read_button() {
-  if (porta == FECHADA) {
-    abre_porta();
+  if (door == CLOSED) {
+    open_door();
   } else {
-    fecha_porta();
+    close_door();
   }
 }
 
 void setup() {
+
+  /* ESP8266 connection */
 
   Serial.begin(115200);
 
@@ -97,24 +106,23 @@ void setup() {
   Firebase.reconnectWiFi(true);
   Firebase.begin(&config, &auth);
 
+  /* Pins */
+
   // TODO: setar as coisas
-  // pinMode(LED_BUILTIN, OUTPUT);
-  // pinMode(D1, INPUT_PULLUP);
+  pinMode(D3, OUTPUT);
 }
 
 void loop() {
-  // if (millis() - dataMillis > 125) {
-  //   dataMillis = millis();
+  if (millis() - dataMillis > 125) {
+    dataMillis = millis();
 
-  //   Firebase.setInt(fbdo, "light", analogRead(A0));
-  //   Firebase.setInt(fbdo, "count", count++);
-  //   Firebase.setInt(fbdo, "button", digitalRead(D1));
+    Firebase.getInt(fbdo, "time");
+    time_seconds = fbdo.intData() * 1000;
 
-  //   Firebase.getInt(fbdo, "led");
-  //   int led = fbdo.intData();
-  //   digitalWrite(LED_BUILTIN, !led);
-
-  //   Serial.printf("Led: %d \n", led);
-  //   Serial.printf("LDR: %d \n", analogRead(A0));
-  // }
+    Firebase.getInt(fbdo, "start");
+    if (fbdo.intData() == 1 and time_seconds != 0) {
+      start();
+    }
+    Firebase.setInt(fbdo, "start", 0);
+  }
 }
