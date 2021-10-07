@@ -23,8 +23,8 @@ int led_r = D0;
 int led_y = D2;
 int led_g = D1;
 int buzzer = D3;
+int button = D4;
 int door_is_open;
-int button;
 int power;
 unsigned long time_mseconds;
 
