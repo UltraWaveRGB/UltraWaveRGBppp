@@ -1,8 +1,8 @@
-// TODO: checar
 #define OFF 0
 #define ON 1
 #define CLOSED 0
 #define OPEN 1
+#define MAX_BRIGHTNESS 255
 
 void spin();
 void start();
