@@ -33,11 +33,10 @@ void spin() {
   unsigned long old = millis();
   unsigned long now = millis();
   unsigned int time_remain = time_mseconds / 1000;
+  // FIXME: calculo de tempo quando parar a contagem
   while (now - old < time_mseconds) {
+    read_button();
     now = millis();
-    if (door_is_open == OPEN) {
-      break;
-    }
     // FIXME: envio de timer para firebase
     unsigned int current_left = (time_mseconds - (now - old)) / 1000;
     if (current_left != time_remain) {
@@ -63,29 +62,36 @@ void start() {
 void stop() {
   Firebase.setInt(fbdo, "time", 0);
   digitalWrite(led_r, OFF);
+  digitalWrite(led_y, OFF);
   digitalWrite(led_g, OFF);
   tone(buzzer, 757, 200);
 }
 
-void open_door_is_open() {
+void open_door() {
   digitalWrite(led_y, ON);
+  digitalWrite(led_r, OFF);
+  digitalWrite(led_g, OFF);
   door_is_open = OPEN;
 }
 
-void close_door_is_open() {
-  digitalWrite(led_y, OFF);
+void close_door() {
+  digitalWrite(led_y, ON);
+  digitalWrite(led_r, power);
+  digitalWrite(led_g, ON);
   door_is_open = CLOSED;
 }
 
-/* --------------------------- */
-
 void read_button() {
-  if (door_is_open == CLOSED) {
-    open_door_is_open();
-  } else {
-    close_door_is_open();
+  int button_state = digitalRead(button);
+  while (button_state == LOW) {
+    button_state = digitalRead(button);
+    open_door();
+    yield();
   }
+  close_door();
 }
+
+/* --------------------------- */
 
 void setup() {
 
@@ -119,9 +125,11 @@ void setup() {
   pinMode(led_r, OUTPUT);
   pinMode(led_g, OUTPUT);
   pinMode(led_y, OUTPUT);
+  pinMode(button, INPUT_PULLUP);
 }
 
 void loop() {
+
   if (millis() - dataMillis > 125) {
     dataMillis = millis();
 

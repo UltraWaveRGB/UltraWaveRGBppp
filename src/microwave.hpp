@@ -9,3 +9,5 @@ void start();
 void stop();
 void open_door();
 void close_door();
+void update_door_state();
+void read_button();
