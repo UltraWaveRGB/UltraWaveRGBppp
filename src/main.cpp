@@ -27,18 +27,19 @@ int button = D4;
 int door_is_open;
 int power;
 unsigned long time_mseconds;
+unsigned long past;
+unsigned long now;
 
 void spin() {
   // ** roda por n segundos
-  unsigned long old = millis();
-  unsigned long now = millis();
+  past = millis();
+  now = millis();
   unsigned int time_remain = time_mseconds / 1000;
-  // FIXME: calculo de tempo quando parar a contagem
-  while (now - old < time_mseconds) {
+  while (now - past < time_mseconds) {
     read_button();
     now = millis();
     // FIXME: envio de timer para firebase
-    unsigned int current_left = (time_mseconds - (now - old)) / 1000;
+    unsigned int current_left = (time_mseconds - (now - past)) / 1000;
     if (current_left != time_remain) {
       time_remain = current_left;
       Serial.printf("Time remaining: %d \n", time_remain);
@@ -83,12 +84,14 @@ void close_door() {
 
 void read_button() {
   int button_state = digitalRead(button);
+  unsigned long stop = millis();
   while (button_state == LOW) {
     button_state = digitalRead(button);
     open_door();
     yield();
   }
   close_door();
+  past += millis() - stop;
 }
 
 /* --------------------------- */
