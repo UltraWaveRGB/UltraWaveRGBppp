@@ -11,6 +11,7 @@
 #include "secret.hpp"
 
 FirebaseData fbdo;
+FirebaseData stream;
 FirebaseAuth auth;
 FirebaseConfig config;
 
@@ -24,6 +25,9 @@ int led_y = D2;
 int led_g = D1;
 int buzzer = D3;
 int button = D4;
+// ** 1 pra parar, 2 para cancelar **
+int should_stop = 0;
+
 int door_is_open;
 int power;
 unsigned long time_mseconds;
@@ -37,6 +41,11 @@ void spin() {
   unsigned int time_remain = time_mseconds / 1000;
   while (now - past < time_mseconds) {
     read_button();
+    if (should_stop == STOP) {
+      wait();
+    } else if (should_stop == CANCEL) {
+      break;
+    }
     now = millis();
     // FIXME: envio de timer para firebase
     unsigned int current_left = (time_mseconds - (now - past)) / 1000;
@@ -62,6 +71,8 @@ void start() {
 
 void stop() {
   Firebase.setInt(fbdo, "time", 0);
+  Firebase.setInt(fbdo, "stop", 0);
+  should_stop = 0;
   digitalWrite(led_r, OFF);
   digitalWrite(led_y, OFF);
   digitalWrite(led_g, OFF);
@@ -84,17 +95,49 @@ void close_door() {
 
 void read_button() {
   int button_state = digitalRead(button);
-  unsigned long stop = millis();
+  unsigned long last = millis();
   while (button_state == LOW) {
     button_state = digitalRead(button);
     open_door();
     yield();
   }
   close_door();
-  past += millis() - stop;
+  past += millis() - last;
 }
 
-/* --------------------------- */
+void wait() {
+  unsigned long last = millis();
+  while (should_stop == 1) {
+    yield();
+  }
+  past += millis() - last;
+}
+
+/* ---- stream functions ----- */
+
+void streamCallback(StreamData data) {
+  if (strcmp(data.dataPath().c_str(), "/stop") == 0) {
+    // TODO: melhorar essa logica
+    if (should_stop == 0) {
+      should_stop = STOP;
+    } else if (should_stop == 1) {
+      should_stop = CANCEL;
+    }
+  }
+}
+
+void streamCallbackTimeout(bool timeout) {
+  if (timeout) {
+    Serial.println("stream timed out, resuming...\n");
+  }
+
+  if (!stream.httpConnected()) {
+    Serial.printf("error code: %d, reason: %s\n\n", stream.httpCode(),
+                  stream.errorReason().c_str());
+  }
+}
+
+/* ---- default functions ---- */
 
 void setup() {
 
@@ -121,6 +164,20 @@ void setup() {
 
   Firebase.reconnectWiFi(true);
   Firebase.begin(&config, &auth);
+
+  /* Stream setup */
+
+// Recommend for ESP8266 stream, adjust the buffer size to match your stream
+// data size
+// #if defined(ESP8266)
+//   stream.setBSSLBufferSize(1024, 512);  // !! nao faco ideia do tamanho entao so botei o que ja tava
+// #endif
+
+  // if (!Firebase.beginStream(stream, "/stop")) {
+  //   Serial.printf("stream begin error, %s\n\n", stream.errorReason().c_str());
+  // }
+
+  // Firebase.setStreamCallback(stream, streamCallback, streamCallbackTimeout);
 
   /* Pins */
 
