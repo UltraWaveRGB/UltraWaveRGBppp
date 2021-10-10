@@ -43,7 +43,7 @@ void spin() {
     if (current_left != time_remain) {
       time_remain = current_left;
       Serial.printf("Time remaining: %d \n", time_remain);
-      // Firebase.setInt(fbdo, "time", time_remain);
+      Firebase.setIntAsync(fbdo, "time", time_remain);
     }
     // ** evita bloqueio das funcoes em background na placa
     yield();
