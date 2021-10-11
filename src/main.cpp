@@ -188,6 +188,7 @@ void setup() {
   /* Firebase variables */
 
   Firebase.setInt(fbdo, "state", 0);
+  Firebase.setInt(fbdo, "time", 0);
 
   Serial.println("Start!");
 }
