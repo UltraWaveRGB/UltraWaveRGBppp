@@ -25,14 +25,22 @@ int led_y = D2;
 int led_g = D1;
 int buzzer = D3;
 int button = D4;
-// ** 1 pra parar, 2 para cancelar **
-int should_stop = 0;
 
+int state;
 int door_is_open;
 int power;
 unsigned long time_mseconds;
 unsigned long past;
 unsigned long now;
+
+void start() {
+  if (door_is_open == CLOSED) {
+    tone(buzzer, 500, 250);
+    digitalWrite(led_g, ON);
+    digitalWrite(led_r, power);
+    spin();
+  }
+}
 
 void spin() {
   // ** roda por n segundos
@@ -41,13 +49,14 @@ void spin() {
   unsigned int time_remain = time_mseconds / 1000;
   while (now - past < time_mseconds) {
     read_button();
-    if (should_stop == STOP) {
+    // FIXME: state nao atualiza pelo callback durante o loop
+    if (state == STATE_PAUSED) {
       wait();
-    } else if (should_stop == CANCEL) {
+    }
+    if (state == STATE_OFF) {
       break;
     }
     now = millis();
-    // FIXME: envio de timer para firebase
     unsigned int current_left = (time_mseconds - (now - past)) / 1000;
     if (current_left != time_remain) {
       time_remain = current_left;
@@ -60,19 +69,10 @@ void spin() {
   stop();
 }
 
-void start() {
-  if (door_is_open == CLOSED) {
-    tone(buzzer, 500, 250);
-    digitalWrite(led_g, ON);
-    digitalWrite(led_r, power);
-    spin();
-  }
-}
-
 void stop() {
+  state = STATE_OFF;
   Firebase.setInt(fbdo, "time", 0);
-  Firebase.setInt(fbdo, "stop", 0);
-  should_stop = 0;
+  Firebase.setInt(fbdo, "state", state);
   digitalWrite(led_r, OFF);
   digitalWrite(led_y, OFF);
   digitalWrite(led_g, OFF);
@@ -107,7 +107,8 @@ void read_button() {
 
 void wait() {
   unsigned long last = millis();
-  while (should_stop == 1) {
+  while (state == STATE_PAUSED) {
+    read_button();
     yield();
   }
   past += millis() - last;
@@ -116,13 +117,10 @@ void wait() {
 /* ---- stream functions ----- */
 
 void streamCallback(StreamData data) {
-  if (strcmp(data.dataPath().c_str(), "/stop") == 0) {
-    // TODO: melhorar essa logica
-    if (should_stop == 0) {
-      should_stop = STOP;
-    } else if (should_stop == 1) {
-      should_stop = CANCEL;
-    }
+  Serial.printf("data path: %s\n", data.dataPath().c_str());
+  if (strcmp(data.dataPath().c_str(), "/state") == 0) {
+    Firebase.getInt(fbdo, "state");
+    state = fbdo.intData();
   }
 }
 
@@ -169,15 +167,15 @@ void setup() {
 
 // Recommend for ESP8266 stream, adjust the buffer size to match your stream
 // data size
-// #if defined(ESP8266)
-//   stream.setBSSLBufferSize(1024, 512);  // !! nao faco ideia do tamanho entao so botei o que ja tava
-// #endif
+#if defined(ESP8266)
+  stream.setBSSLBufferSize(1024, 512);
+#endif
 
-  // if (!Firebase.beginStream(stream, "/stop")) {
-  //   Serial.printf("stream begin error, %s\n\n", stream.errorReason().c_str());
-  // }
+  if (!Firebase.beginStream(stream, "/")) {
+    Serial.printf("stream begin error, %s\n\n", stream.errorReason().c_str());
+  }
 
-  // Firebase.setStreamCallback(stream, streamCallback, streamCallbackTimeout);
+  Firebase.setStreamCallback(stream, streamCallback, streamCallbackTimeout);
 
   /* Pins */
 
@@ -186,6 +184,12 @@ void setup() {
   pinMode(led_g, OUTPUT);
   pinMode(led_y, OUTPUT);
   pinMode(button, INPUT_PULLUP);
+
+  /* Firebase variables */
+
+  Firebase.setInt(fbdo, "state", 0);
+
+  Serial.println("Start!");
 }
 
 void loop() {
@@ -196,10 +200,10 @@ void loop() {
     Firebase.getInt(fbdo, "time");
     time_mseconds = fbdo.intData() * 1000;
 
-    Firebase.getInt(fbdo, "start");
-    if (fbdo.intData() == 1 and time_mseconds != 0) {
+    if (state == STATE_ON and time_mseconds != 0) {
       start();
-      Firebase.setInt(fbdo, "start", 0);
+      Firebase.setInt(fbdo, "state", 0);
+      Serial.println("Waiting...");
     }
 
     Firebase.getInt(fbdo, "power");
@@ -207,6 +211,5 @@ void loop() {
     if (power > MAX_BRIGHTNESS) {
       power = MAX_BRIGHTNESS;
     }
-    Serial.printf("power: %d \n", power);
   }
 }

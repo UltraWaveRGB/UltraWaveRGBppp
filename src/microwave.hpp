@@ -3,8 +3,9 @@
 #define CLOSED 0
 #define OPEN 1
 #define MAX_BRIGHTNESS 255
-#define STOP 1
-#define CANCEL 2
+#define STATE_OFF 0
+#define STATE_ON 1
+#define STATE_PAUSED 2
 
 void spin();
 void start();
