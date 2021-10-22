@@ -26,26 +26,27 @@ int button = D4;
 int state = OFF_DOOR_CLOSED;
 int timer = 0;
 int power;
+int buzz_count = 3;
 
 int is_door_open(){
   return !digitalRead(button);
 }
 
 int stop_button_was_pressed(){
-  Firebase.getInt(fbdo,"stop_button_pressed");
+  Firebase.getInt(fbdo,"stop_button_was_pressed");
   int pressed = fbdo.intData();
   if (pressed == TRUE){
-    Firebase.setInt(fbdo,"stop_button_pressed", FALSE);
+    Firebase.setInt(fbdo,"stop_button_was_pressed", FALSE);
     return TRUE;
   }
   return FALSE;
 }
 
 int start_button_was_pressed(){
-  Firebase.getInt(fbdo,"start_button_pressed");
+  Firebase.getInt(fbdo,"start_button_was_pressed");
   int pressed = fbdo.intData();
   if (pressed == TRUE){
-    Firebase.setInt(fbdo,"start_button_pressed", FALSE);
+    Firebase.setInt(fbdo,"start_button_was_pressed", FALSE);
     return TRUE;
   }
   return FALSE;
@@ -75,12 +76,16 @@ void update_power(){
   Serial.printf("Power: %d \n", power);
 }
 
-void buzz_one_time(){
-  tone(buzzer, 757, 200);
-}
+void ring(){
 
-void buzz_after_execution_finished(){
-  //TODO: Buzz a few times to represent the execution finished
+  if (millis() > time_now + 2000){
+    time_now = millis();
+    if (buzz_count > 0) {
+      tone(buzzer, 880, 1000);
+      buzz_count = buzz_count - 1;
+    }
+     noTone(buzzer);
+  
 }
 
 void setup() {
@@ -123,8 +128,6 @@ void setup() {
 
 void loop() {
 
-  time_now = millis();
-
   switch (state) 
   {
     case ON_DOOR_CLOSED:
@@ -142,18 +145,23 @@ void loop() {
       if (is_door_open() == TRUE) {
         state = PAUSED_DOOR_OPEN;
         Serial.println("State changed to: PAUSED_DOOR_OPEN");
+        break;
       }
 
       if (stop_button_was_pressed() == TRUE) {
         state = PAUSED_DOOR_CLOSED;
-        buzz_one_time();
+        buzz_count = 1;
+        ring();
         Serial.println("State changed to: PAUSED_DOOR_CLOSED");
+        break;
       }
 
       if (execution_finished() == TRUE) {
         state = OFF_DOOR_CLOSED;
-        buzz_after_execution_finished();
+        buzz_count = 3;
+        ring();
         Serial.println("State changed to: OFF_DOOR_CLOSED");
+        break;
       }
 
       break;
@@ -167,11 +175,13 @@ void loop() {
       if (is_door_open() == FALSE) {
         state = PAUSED_DOOR_CLOSED;
         Serial.println("State changed to: PAUSED_DOOR_CLOSED");
+        break;
       }
 
       if (stop_button_was_pressed() == FALSE) {
         state = OFF_DOOR_OPEN;
         Serial.println("State changed to: OFF_DOOR_OPEN");
+        break;
       }
 
       break;
@@ -185,16 +195,19 @@ void loop() {
       if (is_door_open() == TRUE) {
         state = PAUSED_DOOR_OPEN;
         Serial.println("State changed to: PAUSED_DOOR_OPEN");
+        break;
       }
 
       if (stop_button_was_pressed() == TRUE) {
         state = OFF_DOOR_CLOSED;
         Serial.println("State changed to: OFF_DOOR_CLOSED");
+        break;
       }
 
       if (start_button_was_pressed() == TRUE) {
         state = ON_DOOR_CLOSED;
         Serial.println("State changed to: ON_DOOR_CLOSED");
+        break;
       }
 
       break;
@@ -208,6 +221,7 @@ void loop() {
       if (is_door_open() == FALSE) {
         state = OFF_DOOR_CLOSED;
         Serial.println("State changed to: OFF_DOOR_CLOSED");
+        break;
       }
 
       break;
@@ -218,18 +232,16 @@ void loop() {
       digitalWrite(led_r, OFF);
       digitalWrite(led_g, OFF);
 
-      Firebase.getInt(fbdo,"Test");
-      int test = fbdo.intData();
-      Serial.printf("Value: %d \n", test);
-
       if (is_door_open() == TRUE) {
         state = OFF_DOOR_OPEN;
         Serial.println("State changed to: OFF_DOOR_OPEN");
+        break;
       }
 
       if (start_button_was_pressed() == TRUE) {
         state = ON_DOOR_CLOSED;
         Serial.println("State changed to: ON_DOOR_CLOSED");
+        break;
       }
 
       break;
