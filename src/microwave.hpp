@@ -2,6 +2,9 @@
 #define ON 1
 #define MAX_BRIGHTNESS 255
 
+#define TRUE 1
+#define FALSE 0
+
 #define ON_DOOR_CLOSED 0
 #define OFF_DOOR_CLOSED 1
 #define OFF_DOOR_OPEN 2
