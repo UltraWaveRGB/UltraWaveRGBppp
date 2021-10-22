@@ -16,3 +16,4 @@ int is_door_open();
 int start_button_was_pressed();
 int stop_button_was_pressed();
 int execution_finished();
+void ring();
