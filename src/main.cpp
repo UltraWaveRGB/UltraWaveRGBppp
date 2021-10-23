@@ -11,171 +11,137 @@
 #include "secret.hpp"
 
 FirebaseData fbdo;
-FirebaseData stream;
 FirebaseAuth auth;
 FirebaseConfig config;
 
 unsigned long dataMillis = 0;
-int count = 0;
-
-/* --- microwave functions --- */
+unsigned long time_now = 0;
+unsigned long time_past = 0;
+unsigned long timer = 0;
 
 int led_r = D0;
 int led_y = D2;
 int led_g = D1;
 int buzzer = D3;
 int button = D4;
+int execution_has_finished = FALSE;
 
-int state;
-int door_is_open;
+int state = OFF_DOOR_CLOSED;
 int power;
-unsigned long time_mseconds;
-unsigned long past;
-unsigned long now;
 
-void start() {
-  if (door_is_open == CLOSED) {
-    tone(buzzer, 500, 250);
-    digitalWrite(led_g, ON);
-    digitalWrite(led_r, power);
-    spin();
+int is_door_open() { return !digitalRead(button); }
+
+int stop_button_was_pressed() {
+  Firebase.getInt(fbdo, "stop_button_was_pressed");
+  int pressed = fbdo.intData();
+  if (pressed == TRUE) {
+    Firebase.setIntAsync(fbdo, "stop_button_was_pressed", FALSE);
+    time_past = millis();
+    return TRUE;
+  }
+  return FALSE;
+}
+
+int start_button_was_pressed() {
+  Firebase.getInt(fbdo, "start_button_was_pressed");
+  int pressed = fbdo.intData();
+  if (pressed == TRUE) {
+    Firebase.getInt(fbdo, "timer");
+    timer = fbdo.intData();
+    Firebase.setInt(fbdo, "start_button_was_pressed", FALSE);
+    time_past = millis();
+    return TRUE;
+  }
+  return FALSE;
+}
+
+int execution_finished() {
+  if (timer == 0) {
+    execution_has_finished = TRUE;
+    return TRUE;
+  }
+  return FALSE;
+}
+
+void update_timer() {
+  if (timer > 0) {
+    timer--;
+    Firebase.setIntAsync(fbdo, "timer", timer);
+    Serial.printf("timer: %ld\n", timer);
   }
 }
 
-void spin() {
-  // ** roda por n segundos
-  past = millis();
-  now = millis();
-  unsigned int time_remain = time_mseconds / 1000;
-  while (now - past < time_mseconds) {
-    read_button();
-    // FIXME: state nao atualiza pelo callback durante o loop
-    if (state == STATE_PAUSED) {
-      wait();
+void update_power() {
+  Firebase.getInt(fbdo, "power");
+  power = fbdo.intData();
+  if (power > MAX_POWER) {
+    power = MAX_POWER;
+  }
+}
+
+void ring_buzzer() {
+  Serial.println("Execution Finished - Ringing buzzer");
+  execution_has_finished = FALSE;
+  for (int i = 0; i < NUMBER_OF_TONES; i++) {
+    if (is_door_open() == TRUE) {
+      digitalWrite(led_y, ON);
+    } else {
+      digitalWrite(led_y, OFF);
     }
-    if (state == STATE_OFF) {
-      break;
+    if (start_button_was_pressed() == TRUE && is_door_open() == FALSE) {
+      state = ON_DOOR_CLOSED;
+      Serial.println("State changed to: ON_DOOR_CLOSED");
+      return;
     }
-    now = millis();
-    unsigned int current_left = (time_mseconds - (now - past)) / 1000;
-    if (current_left != time_remain) {
-      time_remain = current_left;
-      Serial.printf("Time remaining: %d \n", time_remain);
-      Firebase.setIntAsync(fbdo, "time", time_remain);
+    tone(buzzer, 880);
+    delay(TONE_DURATION);
+    if (is_door_open() == TRUE) {
+      digitalWrite(led_y, ON);
+    } else {
+      digitalWrite(led_y, OFF);
     }
-    // ** evita bloqueio das funcoes em background na placa
-    yield();
-  }
-  stop();
-}
-
-void stop() {
-  state = STATE_OFF;
-  Firebase.setInt(fbdo, "time", 0);
-  Firebase.setInt(fbdo, "state", state);
-  digitalWrite(led_r, OFF);
-  digitalWrite(led_y, OFF);
-  digitalWrite(led_g, OFF);
-  tone(buzzer, 757, 200);
-}
-
-void open_door() {
-  digitalWrite(led_y, ON);
-  digitalWrite(led_r, OFF);
-  digitalWrite(led_g, OFF);
-  door_is_open = OPEN;
-}
-
-void close_door() {
-  digitalWrite(led_y, ON);
-  digitalWrite(led_r, power);
-  digitalWrite(led_g, ON);
-  door_is_open = CLOSED;
-}
-
-void read_button() {
-  int button_state = digitalRead(button);
-  unsigned long last = millis();
-  while (button_state == LOW) {
-    button_state = digitalRead(button);
-    open_door();
-    yield();
-  }
-  close_door();
-  past += millis() - last;
-}
-
-void wait() {
-  unsigned long last = millis();
-  while (state == STATE_PAUSED) {
-    read_button();
-    yield();
-  }
-  past += millis() - last;
-}
-
-/* ---- stream functions ----- */
-
-void streamCallback(StreamData data) {
-  Serial.printf("data path: %s\n", data.dataPath().c_str());
-  if (strcmp(data.dataPath().c_str(), "/state") == 0) {
-    Firebase.getInt(fbdo, "state");
-    state = fbdo.intData();
+    noTone(buzzer);
+    delay(INTERVAL_BETWEEN_TONES);
+    if (start_button_was_pressed() == TRUE && is_door_open() == FALSE) {
+      state = ON_DOOR_CLOSED;
+      Serial.println("State changed to: ON_DOOR_CLOSED");
+      return;
+    }
   }
 }
-
-void streamCallbackTimeout(bool timeout) {
-  if (timeout) {
-    Serial.println("stream timed out, resuming...\n");
-  }
-
-  if (!stream.httpConnected()) {
-    Serial.printf("error code: %d, reason: %s\n\n", stream.httpCode(),
-                  stream.errorReason().c_str());
-  }
-}
-
-/* ---- default functions ---- */
 
 void setup() {
 
-  /* ESP8266 connection */
-
   Serial.begin(115200);
 
+  /* Wi-fi Connection */
+
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  Serial.print("Connecting to Wi-Fi");
+  Serial.print("Connecting to Wi-Fi... \n");
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(300);
+    delay(2000);
+    Serial.print("Connecting to Wi-Fi... \n");
   }
-
-  Serial.println();
+  Serial.println("Connected to Wi-Fi !");
   Serial.print("Connected with IP: ");
   Serial.println(WiFi.localIP());
   Serial.println();
-  Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
 
+  /* Firebase Connection */
+
+  Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
   config.database_url = DATABASE_URL;
   config.signer.tokens.legacy_token = DATABASE_SECRET;
-
   Firebase.reconnectWiFi(true);
   Firebase.begin(&config, &auth);
 
-  /* Stream setup */
+  /* Reseting Database to Default Values */
 
-// Recommend for ESP8266 stream, adjust the buffer size to match your stream
-// data size
-#if defined(ESP8266)
-  stream.setBSSLBufferSize(1024, 512);
-#endif
-
-  if (!Firebase.beginStream(stream, "/")) {
-    Serial.printf("stream begin error, %s\n\n", stream.errorReason().c_str());
-  }
-
-  Firebase.setStreamCallback(stream, streamCallback, streamCallbackTimeout);
+  Firebase.setInt(fbdo, "timer", 0);
+  Firebase.setInt(fbdo, "door_is_open", FALSE);
+  Firebase.setInt(fbdo, "start_button_was_pressed", FALSE);
+  Firebase.setInt(fbdo, "stop_button_was_pressed", FALSE);
+  Firebase.setInt(fbdo, "power", MAX_POWER);
 
   /* Pins */
 
@@ -185,32 +151,135 @@ void setup() {
   pinMode(led_y, OUTPUT);
   pinMode(button, INPUT_PULLUP);
 
-  /* Firebase variables */
-
-  Firebase.setInt(fbdo, "state", 0);
-  Firebase.setInt(fbdo, "time", 0);
-
-  Serial.println("Start!");
+  Serial.println("Project Started!");
 }
 
 void loop() {
 
-  if (millis() - dataMillis > 125) {
-    dataMillis = millis();
+  switch (state) {
+  case ON_DOOR_CLOSED:
 
-    Firebase.getInt(fbdo, "time");
-    time_mseconds = fbdo.intData() * 1000;
+    digitalWrite(led_y, ON);
+    digitalWrite(led_r, power);
+    digitalWrite(led_g, ON);
 
-    if (state == STATE_ON and time_mseconds != 0) {
-      start();
-      Firebase.setInt(fbdo, "state", 0);
-      Serial.println("Waiting...");
+    time_now = time_past - millis();
+
+    if (time_now >= 1000) {
+      time_past = millis();
+      update_timer();
+      update_power();
     }
 
-    Firebase.getInt(fbdo, "power");
-    power = fbdo.intData();
-    if (power > MAX_BRIGHTNESS) {
-      power = MAX_BRIGHTNESS;
+    if (is_door_open() == TRUE) {
+      state = PAUSED_DOOR_OPEN;
+      Firebase.setIntAsync(fbdo, "door_is_open", TRUE);
+      Serial.println("State changed to: PAUSED_DOOR_OPEN");
+      break;
     }
+
+    if (stop_button_was_pressed() == TRUE) {
+      state = PAUSED_DOOR_CLOSED;
+      Serial.println("State changed to: PAUSED_DOOR_CLOSED");
+      break;
+    }
+
+    if (execution_finished() == TRUE) {
+      state = OFF_DOOR_CLOSED;
+      Serial.println("State changed to: OFF_DOOR_CLOSED");
+      break;
+    }
+
+    break;
+
+  case PAUSED_DOOR_OPEN:
+
+    digitalWrite(led_y, ON);
+    digitalWrite(led_r, OFF);
+    digitalWrite(led_g, OFF);
+
+    if (is_door_open() == FALSE) {
+      state = PAUSED_DOOR_CLOSED;
+      Firebase.setIntAsync(fbdo, "door_is_open", FALSE);
+      Serial.println("State changed to: PAUSED_DOOR_CLOSED");
+      break;
+    }
+
+    if (stop_button_was_pressed() == TRUE) {
+      state = OFF_DOOR_OPEN;
+      Firebase.setIntAsync(fbdo, "timer", 0);
+      Serial.println("State changed to: OFF_DOOR_OPEN");
+      break;
+    }
+
+    break;
+
+  case PAUSED_DOOR_CLOSED:
+
+    digitalWrite(led_y, ON);
+    digitalWrite(led_r, OFF);
+    digitalWrite(led_g, OFF);
+
+    if (is_door_open() == TRUE) {
+      state = PAUSED_DOOR_OPEN;
+      Firebase.setIntAsync(fbdo, "door_is_open", TRUE);
+      Serial.println("State changed to: PAUSED_DOOR_OPEN");
+      break;
+    }
+
+    if (stop_button_was_pressed() == TRUE) {
+      state = OFF_DOOR_CLOSED;
+      Firebase.setIntAsync(fbdo, "timer", 0);
+      Serial.println("State changed to: OFF_DOOR_CLOSED");
+      break;
+    }
+
+    if (start_button_was_pressed() == TRUE) {
+      state = ON_DOOR_CLOSED;
+      Serial.println("State changed to: ON_DOOR_CLOSED");
+      break;
+    }
+
+    break;
+
+  case OFF_DOOR_OPEN:
+
+    digitalWrite(led_y, ON);
+    digitalWrite(led_r, OFF);
+    digitalWrite(led_g, OFF);
+
+    if (is_door_open() == FALSE) {
+      state = OFF_DOOR_CLOSED;
+      Firebase.setIntAsync(fbdo, "door_is_open", FALSE);
+      Serial.println("State changed to: OFF_DOOR_CLOSED");
+      break;
+    }
+
+    break;
+
+  case OFF_DOOR_CLOSED:
+
+    digitalWrite(led_y, OFF);
+    digitalWrite(led_r, OFF);
+    digitalWrite(led_g, OFF);
+
+    if (execution_has_finished == TRUE) {
+      ring_buzzer();
+    }
+
+    if (is_door_open() == TRUE) {
+      state = OFF_DOOR_OPEN;
+      Firebase.setIntAsync(fbdo, "door_is_open", TRUE);
+      Serial.println("State changed to: OFF_DOOR_OPEN");
+      break;
+    }
+
+    if (start_button_was_pressed() == TRUE) {
+      state = ON_DOOR_CLOSED;
+      Serial.println("State changed to: ON_DOOR_CLOSED");
+      break;
+    }
+
+    break;
   }
 }
