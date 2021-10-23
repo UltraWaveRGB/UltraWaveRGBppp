@@ -50,7 +50,6 @@ int start_button_was_pressed() {
     timer = fbdo.intData();
     Firebase.setInt(fbdo, "start_button_was_pressed", FALSE);
     time_past = millis();
-    tone(buzzer, 880, 1000);
     return TRUE;
   }
   return FALSE;
@@ -80,28 +79,30 @@ void update_power() {
   }
 }
 
-void ring_buzzer(){
+void ring_buzzer() {
   Serial.println("Execution Finished - Ringing buzzer");
   execution_has_finished = FALSE;
-  for(int i = 0; i < NUMBER_OF_TONES; i++){
-    if (is_door_open() == TRUE){
+  for (int i = 0; i < NUMBER_OF_TONES; i++) {
+    if (is_door_open() == TRUE) {
       digitalWrite(led_y, ON);
     } else {
       digitalWrite(led_y, OFF);
     }
-    if(start_button_was_pressed() == TRUE && is_door_open() == FALSE){
+    if (start_button_was_pressed() == TRUE && is_door_open() == FALSE) {
       state = ON_DOOR_CLOSED;
       Serial.println("State changed to: ON_DOOR_CLOSED");
       return;
     }
-    tone(buzzer, 880, TONE_DURATION);
-    if (is_door_open() == TRUE){
+    tone(buzzer, 880);
+    delay(TONE_DURATION);
+    if (is_door_open() == TRUE) {
       digitalWrite(led_y, ON);
     } else {
       digitalWrite(led_y, OFF);
     }
-    tone(buzzer, 0, INTERVAL_BETWEEN_TONES);
-    if(start_button_was_pressed() == TRUE && is_door_open() == FALSE){
+    noTone(buzzer);
+    delay(INTERVAL_BETWEEN_TONES);
+    if (start_button_was_pressed() == TRUE && is_door_open() == FALSE) {
       state = ON_DOOR_CLOSED;
       Serial.println("State changed to: ON_DOOR_CLOSED");
       return;
