@@ -56,8 +56,8 @@ int start_button_was_pressed() {
 }
 
 int execution_finished() {
-  execution_has_finished = TRUE;
   if (timer == 0) {
+    execution_has_finished = TRUE;
     return TRUE;
   }
   return FALSE;
