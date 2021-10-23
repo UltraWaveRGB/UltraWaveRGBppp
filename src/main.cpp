@@ -207,6 +207,7 @@ void loop() {
 
     if (stop_button_was_pressed() == TRUE) {
       state = OFF_DOOR_OPEN;
+      Firebase.setIntAsync(fbdo, "timer", 0);
       Serial.println("State changed to: OFF_DOOR_OPEN");
       break;
     }
@@ -228,6 +229,7 @@ void loop() {
 
     if (stop_button_was_pressed() == TRUE) {
       state = OFF_DOOR_CLOSED;
+      Firebase.setIntAsync(fbdo, "timer", 0);
       Serial.println("State changed to: OFF_DOOR_CLOSED");
       break;
     }
