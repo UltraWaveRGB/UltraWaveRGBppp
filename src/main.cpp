@@ -24,6 +24,7 @@ int led_y = D2;
 int led_g = D1;
 int buzzer = D3;
 int button = D4;
+int execution_has_finished = FALSE;
 
 int state = OFF_DOOR_CLOSED;
 int power;
@@ -56,10 +57,8 @@ int start_button_was_pressed() {
 }
 
 int execution_finished() {
+  execution_has_finished = TRUE;
   if (timer == 0) {
-    tone(buzzer, 880, 1000);
-    tone(buzzer, 880, 1000);
-    tone(buzzer, 880, 1000);
     return TRUE;
   }
   return FALSE;
@@ -76,8 +75,37 @@ void update_timer() {
 void update_power() {
   Firebase.getInt(fbdo, "power");
   power = fbdo.intData();
-  if (power > MAX_BRIGHTNESS) {
-    power = MAX_BRIGHTNESS;
+  if (power > MAX_POWER) {
+    power = MAX_POWER;
+  }
+}
+
+void ring_buzzer(){
+  Serial.println("Execution Finished - Ringing buzzer");
+  execution_has_finished = FALSE;
+  for(int i = 0; i < NUMBER_OF_TONES; i++){
+    if (is_door_open() == TRUE){
+      digitalWrite(led_y, ON);
+    } else {
+      digitalWrite(led_y, OFF);
+    }
+    if(start_button_was_pressed() == TRUE && is_door_open() == FALSE){
+      state = ON_DOOR_CLOSED;
+      Serial.println("State changed to: ON_DOOR_CLOSED");
+      return;
+    }
+    tone(buzzer, 880, TONE_DURATION);
+    if (is_door_open() == TRUE){
+      digitalWrite(led_y, ON);
+    } else {
+      digitalWrite(led_y, OFF);
+    }
+    tone(buzzer, 0, INTERVAL_BETWEEN_TONES);
+    if(start_button_was_pressed() == TRUE && is_door_open() == FALSE){
+      state = ON_DOOR_CLOSED;
+      Serial.println("State changed to: ON_DOOR_CLOSED");
+      return;
+    }
   }
 }
 
@@ -106,8 +134,13 @@ void setup() {
   Firebase.reconnectWiFi(true);
   Firebase.begin(&config, &auth);
 
+  /* Reseting Database to Default Values */
+
   Firebase.setInt(fbdo, "timer", 0);
   Firebase.setInt(fbdo, "door_is_open", FALSE);
+  Firebase.setInt(fbdo, "start_button_was_pressed", FALSE);
+  Firebase.setInt(fbdo, "stop_button_was_pressed", FALSE);
+  Firebase.setInt(fbdo, "power", MAX_POWER);
 
   /* Pins */
 
@@ -226,6 +259,10 @@ void loop() {
     digitalWrite(led_y, OFF);
     digitalWrite(led_r, OFF);
     digitalWrite(led_g, OFF);
+
+    if (execution_has_finished == TRUE) {
+      ring_buzzer();
+    }
 
     if (is_door_open() == TRUE) {
       state = OFF_DOOR_OPEN;
